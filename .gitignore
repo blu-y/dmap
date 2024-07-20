@@ -1,2 +1,2 @@
 exp/old/
-*/open_clip_pytorch_model.bin
+models/*/open_clip_pytorch_model.bin
