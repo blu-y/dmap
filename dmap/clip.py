@@ -5,10 +5,11 @@ import numpy as np
 import PIL
 import torch
 from open_clip import create_model_from_pretrained, get_tokenizer
+from .utils import models_dir
 
 class CLIP:
     def __init__(self, model='ViT-B-32'):
-        pt = './'+model+'/open_clip_pytorch_model.bin'
+        pt = os.path.join(models_dir, model, 'open_clip_pytorch_model.bin')
         if torch.cuda.is_available():
             self.cuda = True
             self.device = torch.device('cuda')

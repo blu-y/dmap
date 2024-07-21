@@ -23,6 +23,7 @@ setup(
             'dmap = dmap.dmap:main',
             'map_saver = dmap.map_saver:main',
             'img_saver = dmap.img_saver:main',
+            'model_downloader = dmap.model_downloader:main',
         ],
     },
 )

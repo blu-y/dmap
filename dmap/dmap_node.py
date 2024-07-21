@@ -21,11 +21,13 @@ from tf2_geometry_msgs import do_transform_point # to transform
 from tf2_ros.transform_listener import TransformListener
 from cv_bridge import CvBridge
 import sensor_msgs_py.point_cloud2 as pc2
-from dmap import CLIP, Camera
+from dmap import CLIP, Camera, exp_dir
+import datetime
+
 sys.path.append(os.getcwd())
 
 class DMAPNode(Node):
-    def __init__(self, camera=0, model='ViT-B-16-SigLIP', leaf_size=0.25, n_div=3):
+    def __init__(self, camera=0, model='ViT-B-16-SigLIP', leaf_size=0.25, n_div=3, debug=False):
         '''
         camera: int (if usb camera, ex) 0, 1, 2, ...)
                 str (if topic, ex) '/camera/image_raw')
@@ -68,6 +70,9 @@ class DMAPNode(Node):
             PoseStamped, '/goal_pose', 1)
         self.scan_subscription
         self.voxel_T = None
+        self.debug = debug
+        self.fd = os.path.join(exp_dir, datetime.datetime.now().strftime('%y%m%d_%H%M'))
+        if not os.path.exists(self.fd): os.makedirs(self.fd)
         ### TODO: Create service to save map, features, features_ind
 
     def get_goal(self, text):
@@ -174,9 +179,10 @@ class DMAPNode(Node):
     def encode_frame(self, frame, voxel_div):
         frame_div = self.split_frame(frame)
         # debug
-        for i in range(self.n_div):
-            # frame_div[i].save(f'./athirdmapper/n_images/{len(self.features)+i}.png')
-            cv2.imwrite(f'./athirdmapper/n_images/{len(self.features)+i}.png', cv2.cvtColor(np.array(frame_div[i]), cv2.COLOR_RGB2BGR))
+        if self.debug:
+            for i in range(self.n_div):
+                # frame_div[i].save(f'{exp_dir}/frames/{len(self.features)+i}.png')
+                cv2.imwrite(f'{exp_dir}/frames/{len(self.features)+i}.png', cv2.cvtColor(np.array(frame_div[i]), cv2.COLOR_RGB2BGR))
         # end debug
         features = (self.clip.encode_images(frame_div))
         # features: [n_div] x [dim]
@@ -259,9 +265,12 @@ class DMAPNode(Node):
             self.last_frame = frame
         except Exception as e:
             self.get_logger().warn(f'{e}')
-            import pickle
-            with open('./athirdmapper/features.pkl', 'wb') as f:
-                pickle.dump(self.features, f)
-            with open('./athirdmapper/features_ind.pkl', 'wb') as f:
-                pickle.dump(self.features_ind, f)
-            self.get_logger().info(f'Saved {len(self.features)} features and {len(self.features_ind)} features_ind')
+            self.save_features()
+    
+    def save_features(self):
+        import pickle
+        with open(f'{self.fd}/features.pkl', 'wb') as f:
+            pickle.dump(self.features, f)
+        with open(f'{self.fd}/features_ind.pkl', 'wb') as f:
+            pickle.dump(self.features_ind, f)
+        self.get_logger().info(f'Saved {len(self.features)} features and {len(self.features_ind)} features_ind')

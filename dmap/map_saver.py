@@ -5,14 +5,14 @@ import cv2
 import yaml
 import os
 from nav_msgs.msg import OccupancyGrid
-from .utils import dmap_src
+from .utils import maps_dir
 import datetime
 
 class MapSaver(Node):
     def __init__(self, fn='map'):
         super().__init__('map_saver')
         self.get_logger().info('Getting map data...')
-        self.fd = os.path.join(dmap_src, 'maps')
+        self.fd = maps_dir
         if not os.path.exists(self.fd): os.makedirs(self.fd)
         self.fn = fn
         self.subscription = self.create_subscription(
