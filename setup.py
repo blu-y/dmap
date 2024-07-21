@@ -17,8 +17,12 @@ setup(
     maintainer_email='a_o@kakao.com',
     description='On-device Object-aware Mapping',
     license='Apache-2.0',
+    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'dmap = dmap.dmap:main',
+            'map_saver = dmap.map_saver:main',
+            'img_saver = dmap.img_saver:main',
         ],
     },
 )

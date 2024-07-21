@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
-from cmapnode import CMAPNode
+from cmap_node import CMAPNode
 
 def main(args=None):
     # camera = 0
