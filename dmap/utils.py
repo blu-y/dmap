@@ -12,3 +12,5 @@ def find_ros2_package_src(package_name):
     try: package_path = get_package_prefix(package_name)
     except PackageNotFoundError: return None
     return package_path + '/../../src/' + package_name
+
+dmap_src = find_ros2_package_src('dmap')

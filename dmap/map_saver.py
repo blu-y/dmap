@@ -5,7 +5,7 @@ import cv2
 import yaml
 import os
 from nav_msgs.msg import OccupancyGrid
-from dmap import dmap_src
+from .utils import dmap_src
 import datetime
 
 class MapSaver(Node):
@@ -13,6 +13,7 @@ class MapSaver(Node):
         super().__init__('map_saver')
         self.get_logger().info('Getting map data...')
         self.fd = os.path.join(dmap_src, 'maps')
+        if not os.path.exists(self.fd): os.makedirs(self.fd)
         self.fn = fn
         self.subscription = self.create_subscription(
             OccupancyGrid,
@@ -35,13 +36,13 @@ class MapSaver(Node):
             resolution = msg.info.resolution
             origin = msg.info.origin
             map_data = np.array(msg.data).reshape((height, width))
-            print(np.unique(map_data))
-            
+            self.get_logger().debug(f'{np.unique(map_data)}')
+
             # Convert the occupancy data to a PGM image
             pgm_data = np.full_like(map_data, 205, dtype=np.uint8)
             pgm_data[np.logical_and(map_data >= 0, map_data <= 25)] = 254
             pgm_data[np.logical_and(map_data >= 65, map_data <= 100)] = 0
-            print(np.unique(pgm_data))
+            self.get_logger().debug(f'{np.unique(pgm_data)}')
             pgm_fn = os.path.join(self.fd, self.fn+'.pgm')
             cv2.imwrite(pgm_fn, pgm_data)
 
@@ -57,13 +58,13 @@ class MapSaver(Node):
             yaml_fn = os.path.join(self.fd, self.fn+'.yaml')
             with open(yaml_fn, 'w') as yaml_file:
                 yaml.dump(map_metadata, yaml_file)
-            
             self.get_logger().info(f'Map saved as {self.fn}.pgm and {self.fn}.yaml')
             self.timer.cancel()
-            self.destroy_node()
-            rclpy.shutdown()
-        except: 
-            self.get_logger().error('Failed to save the map, continue listening...')
+            raise SystemExit
+
+        except Exception as e:
+            self.get_logger().debug(f'Error: {e}') 
+            self.get_logger().info('Failed to get map data, retrying...')
             pass
 
 def main():
@@ -72,7 +73,8 @@ def main():
     node = MapSaver(fn)
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except SystemExit: rclpy.logging.get_logger('map_saver').info(f'Map saved, shutting down...')
+    finally:
         node.destroy_node()
         rclpy.shutdown()
 
