@@ -1,11 +1,11 @@
-from setuptools import find_packages, setup
+from setuptools import setup
 
 package_name = 'dmap'
 
 setup(
     name=package_name,
     version='0.2.0',
-    packages=find_packages(exclude=['test']),
+    packages=[package_name],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -21,7 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'dmap = dmap.dmap:main',
-            'map_saver = dmap.map_saver:main',
+            'map_server = dmap.map_server:main',
             'img_saver = dmap.img_saver:main',
             'model_downloader = dmap.model_downloader:main',
         ],

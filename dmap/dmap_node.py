@@ -5,6 +5,7 @@ import PIL
 import PIL.Image
 from math import cos, sin, inf
 import cv2
+import yaml
 import numpy as np
 import time
 import torch
@@ -22,12 +23,13 @@ from tf2_ros.transform_listener import TransformListener
 from cv_bridge import CvBridge
 import sensor_msgs_py.point_cloud2 as pc2
 from dmap import CLIP, Camera, exp_dir
+from std_srvs.srv import Trigger
 import datetime
 
 sys.path.append(os.getcwd())
 
 class DMAPNode(Node):
-    def __init__(self, camera=0, model='ViT-B-16-SigLIP', leaf_size=0.25, n_div=3, debug=False):
+    def __init__(self, camera=0, model='ViT-B-16-SigLIP', leaf_size=0.25, n_div=3, debug=False, show_prob=False):
         '''
         camera: int (if usb camera, ex) 0, 1, 2, ...)
                 str (if topic, ex) '/camera/image_raw')
@@ -51,7 +53,7 @@ class DMAPNode(Node):
         self.min_range = 0.3
         self.max_range = 3.0
         self.features = []
-        self.features_ind = []
+        self.features_vox = []
         self.fields = [
                 PointField(name='x', offset=0, datatype=PointField.FLOAT32, count=1),
                 PointField(name='y', offset=4, datatype=PointField.FLOAT32, count=1),
@@ -59,8 +61,9 @@ class DMAPNode(Node):
             ]
         self.last_scan_time = time.time()
         self.last_frame_time = 0.0
-        self.scan_subscription = self.create_subscription(
+        self.scan_sub = self.create_subscription(
             LaserScan, '/scan', self.scan_callback, 1)
+        self.scan_sub
         self.scan_pub = []
         for i in range(self.n_div):
             self.scan_pub.append(self.create_publisher(PointCloud2, f'/scan_{i}', 1))
@@ -68,16 +71,17 @@ class DMAPNode(Node):
             String, '/goal_str', self.goal_cb, 1)
         self.goal_pub = self.create_publisher(
             PoseStamped, '/goal_pose', 1)
-        self.scan_subscription
         self.voxel_T = None
         self.debug = debug
         self.fd = os.path.join(exp_dir, datetime.datetime.now().strftime('%y%m%d_%H%M'))
         if not os.path.exists(self.fd): os.makedirs(self.fd)
         if not os.path.exists(f'{self.fd}/frames') and self.debug: os.makedirs(f'{self.fd}/frames')
-        ### TODO: Create service to save map, features, features_ind
+        self.show_prob = show_prob
+        self.get_logger().info('DMAP Node initialized')
+        ### TODO: Create service to save map, features, features_vox
 
     def get_goal(self, text):
-        f_ind = self.features_ind
+        f_ind = self.features_vox
         text_encodings = self.clip.encode_text([text])
         sim = self.clip.similarity(self.features, text_encodings).squeeze()*100
         ssim = F.softmax(torch.tensor(sim), dim=0).numpy()
@@ -88,7 +92,7 @@ class DMAPNode(Node):
         sim_sort_ind = sim_sort_ind[:m]
         conf = {}
         for index in sim_sort_ind:
-            # print(len(features_ind[index]), features_ind[index])
+            # print(len(features_vox[index]), features_vox[index])
             s_i = sim[index]
             n_point = len(f_ind[index])
             for point in f_ind[index]:
@@ -188,9 +192,9 @@ class DMAPNode(Node):
         features = (self.clip.encode_images(frame_div))
         # features: [n_div] x [dim]
         self.features += features
-        self.features_ind += voxel_div
+        self.features_vox += voxel_div
         # self.features: [n_div * frames] x [dim]
-        # self.features_ind: [n_div * frames] x [n_points] x [3]
+        # self.features_vox: [n_div * frames] x [n_points] x [3]
 
     def scan_callback(self, msg: LaserScan):
         self.scan = msg
@@ -260,19 +264,30 @@ class DMAPNode(Node):
             fps = 1/(time.time()-start)
             self.avgfps = (self.avgfps * self.n_frames + fps)/(self.n_frames+1)
             self.n_frames += 1
-            if self.debug:
-                self.get_logger().debug(f"{[len(voxel_i) for voxel_i in voxel_div]} points added in feature {len(self.features_ind)-1}, {fps:.2f} fps, {self.avgfps:.2f} avgfps")
+            self.get_logger().info(f"{[len(voxel_i) for voxel_i in voxel_div]} points added in feature {len(self.features_vox)-1}, {fps:.2f} fps, {self.avgfps:.2f} avgfps")
             self.last_scan_time = time.time()
             self.last_scan = scan
             self.last_frame = frame
         except Exception as e:
             self.get_logger().warn(f'{e}')
-            self.save_features()
     
     def save_features(self):
         import pickle
         with open(f'{self.fd}/features.pkl', 'wb') as f:
             pickle.dump(self.features, f)
-        with open(f'{self.fd}/features_ind.pkl', 'wb') as f:
-            pickle.dump(self.features_ind, f)
-        self.get_logger().info(f'Saved {len(self.features)} features and {len(self.features_ind)} features_ind')
+        with open(f'{self.fd}/features_vox.pkl', 'wb') as f:
+            pickle.dump(self.features_vox, f)
+        self.get_logger().info(f'Saved {len(self.features)} features and {len(self.features_vox)} features_vox')
+
+    def save_map(self):
+        try:
+            self.save_features()
+            cli = self.create_client(Trigger, 'save_map')
+            while not self.cli.wait_for_service(timeout_sec=1.0):
+                self.get_logger().info('service not available, waiting again...')
+            request = Trigger.Request()
+            future = cli.call_async(request)
+            rclpy.spin_until_future_complete(self, future)
+            self.get_logger().info(f'Map saved. {future.result()}')
+        except Exception as e: 
+            self.get_logger().warn(f'Failed to save map: {e}')

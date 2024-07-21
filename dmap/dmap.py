@@ -23,9 +23,9 @@ def main(args=None):
         if thread > 1:
             executer.spin()
         else: rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+    except: pass
     finally:
+        node.save_map()
         node.destroy_node()
         rclpy.shutdown()
 

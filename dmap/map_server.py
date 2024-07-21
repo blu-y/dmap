@@ -4,15 +4,16 @@ import numpy as np
 import cv2
 import yaml
 import os
+import glob
 from nav_msgs.msg import OccupancyGrid
-from .utils import maps_dir
-import datetime
+from std_srvs.srv import Trigger
+from .utils import exp_dir
 
-class MapSaver(Node):
-    def __init__(self, fn='map'):
-        super().__init__('map_saver')
+class MapServer(Node):
+    def __init__(self, fn=None):
+        super().__init__('map_server')
         self.get_logger().info('Getting map data...')
-        self.fd = maps_dir
+        self.fd = exp_dir
         if not os.path.exists(self.fd): os.makedirs(self.fd)
         self.fn = fn
         self.subscription = self.create_subscription(
@@ -21,14 +22,21 @@ class MapSaver(Node):
             self.map_callback,
             10
         )
+        self.srv = self.create_service(Trigger, '/save_map', self.save_map_cb)
         self.subscription  # Prevent unused variable warning
-        self.map = OccupancyGrid()
-        self.timer = self.create_timer(10, self.save_map)
+        self.map = None
 
     def map_callback(self, msg):
         self.map = msg
+        self.get_logger().info(f'Map Updated: {msg.info.width}x{msg.info.height}')
     
-    def save_map(self):
+    def save_map_cb(self, request, response):
+        self.get_logger().info('Saving map...')
+        if self.fn is None:
+            self.fn = sorted(os.listdir(exp_dir))[-1]+'/map'
+        if self.map is None:
+            self.get_logger().info('No map data received yet')
+            return
         try:
             msg = self.map
             width = msg.info.width
@@ -59,21 +67,22 @@ class MapSaver(Node):
             with open(yaml_fn, 'w') as yaml_file:
                 yaml.dump(map_metadata, yaml_file)
             self.get_logger().info(f'Map saved as {self.fn}.pgm and {self.fn}.yaml')
-            self.timer.cancel()
-            raise SystemExit
-
+            response.success = True
+            response.message = f'Map saved as {self.fn}.pgm and {self.fn}.yaml'
+            
         except Exception as e:
             self.get_logger().debug(f'Error: {e}') 
             self.get_logger().info('Failed to get map data, retrying...')
-            pass
+            response.success = False
+
+        return response
 
 def main():
     rclpy.init()
-    fn = datetime.datetime.now().strftime("%y%m%d_%H%M")
-    node = MapSaver(fn)
+    node = MapServer()
     try:
         rclpy.spin(node)
-    except SystemExit: rclpy.logging.get_logger('map_saver').info(f'Map saved, shutting down...')
+    except SystemExit: rclpy.logging.get_logger('map_server').info(f'Map saved, shutting down...')
     finally:
         node.destroy_node()
         rclpy.shutdown()
