@@ -22,7 +22,7 @@ from tf2_geometry_msgs import do_transform_point # to transform
 from tf2_ros.transform_listener import TransformListener
 from cv_bridge import CvBridge
 import sensor_msgs_py.point_cloud2 as pc2
-from utils import CLIP, Camera
+from dmap import CLIP, Camera
 sys.path.append(os.getcwd())
 
 class CMAPNode(Node):

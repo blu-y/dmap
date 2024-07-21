@@ -2,7 +2,7 @@ import cv2
 import datetime
 import time
 import os
-from utils import find_ros2_package_src
+from dmap import find_ros2_package_src
 def capture_image(cam=0, w=1024, h=576, fps=30):
     last_t = time.time()
     cap = cv2.VideoCapture(cam, cv2.CAP_V4L)
@@ -27,11 +27,11 @@ def capture_image(cam=0, w=1024, h=576, fps=30):
         if fn - last_t >= 0.02:
             file_name = f"{fd}/{fn:.7f}.png"
             cv2.imwrite(file_name, frame)
-            # print(frame.shape, 'Image saved!', file_name)
+            print(frame.shape, 'Image saved!', file_name)
             last_t = fn
         # Check if the Esc key is pressed
         if key == 27:
             break
     cap.release()
     cv2.destroyAllWindows()
-capture_image(1)
+capture_image(2)
