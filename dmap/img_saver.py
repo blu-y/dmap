@@ -2,14 +2,14 @@ import cv2
 import datetime
 import time
 import os
-from dmap import find_ros2_package_src
+from dmap import dmap_src
 def capture_image(cam=0, w=1024, h=576, fps=30):
     last_t = time.time()
     cap = cv2.VideoCapture(cam, cv2.CAP_V4L)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
     cap.set(cv2.CAP_PROP_FPS, fps)
-    src = find_ros2_package_src('dmap')
+    src = dmap_src
     fd = datetime.datetime.now().strftime("%y%m%d_%H%M")
     fd = src + '/images/' + fd
     # print(fd)

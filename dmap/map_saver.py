@@ -5,10 +5,14 @@ import cv2
 import yaml
 import os
 from nav_msgs.msg import OccupancyGrid
+from dmap import dmap_src
+import datetime
 
 class MapSaver(Node):
-    def __init__(self, fn='map.pgm'):
+    def __init__(self, fn='map'):
         super().__init__('map_saver')
+        self.get_logger().info('Getting map data...')
+        self.fd = os.path.join(dmap_src, 'maps')
         self.fn = fn
         self.subscription = self.create_subscription(
             OccupancyGrid,
@@ -37,26 +41,34 @@ class MapSaver(Node):
             pgm_data = np.full_like(map_data, 205, dtype=np.uint8)
             pgm_data[np.logical_and(map_data >= 0, map_data <= 25)] = 254
             pgm_data[np.logical_and(map_data >= 65, map_data <= 100)] = 0
-            cv2.imwrite(self.fn+'.pgm', pgm_data)
+            print(np.unique(pgm_data))
+            pgm_fn = os.path.join(self.fd, self.fn+'.pgm')
+            cv2.imwrite(pgm_fn, pgm_data)
 
             # Save the metadata to a YAML file
             map_metadata = {
-                'image': f'{os.path.basename(self.fn)}.pgm',
+                'image': f'{self.fn}.pgm',
                 'resolution': resolution,
                 'origin': [origin.position.x, origin.position.y, origin.position.z],
                 'negate': 0,
                 'occupied_thresh': 0.65,
                 'free_thresh': 0.25
             }
-            with open(self.fn+'.yaml', 'w') as yaml_file:
+            yaml_fn = os.path.join(self.fd, self.fn+'.yaml')
+            with open(yaml_fn, 'w') as yaml_file:
                 yaml.dump(map_metadata, yaml_file)
             
             self.get_logger().info(f'Map saved as {self.fn}.pgm and {self.fn}.yaml')
-        except: pass
+            self.timer.cancel()
+            self.destroy_node()
+            rclpy.shutdown()
+        except: 
+            self.get_logger().error('Failed to save the map, continue listening...')
+            pass
 
 def main():
     rclpy.init()
-    fn = './athirdmapper/map'
+    fn = datetime.datetime.now().strftime("%y%m%d_%H%M")
     node = MapSaver(fn)
     try:
         rclpy.spin(node)
