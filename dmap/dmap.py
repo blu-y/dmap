@@ -1,4 +1,5 @@
 import rclpy
+import rclpy.logging
 from rclpy.executors import MultiThreadedExecutor
 from dmap import DMAPNode
 
@@ -13,8 +14,8 @@ def main(args=None):
     n_div = 3
     thread = 2
     rclpy.init(args=args)
-    rclpy.logging.set_logger_level('cmap', rclpy.logging.LoggingSeverity.DEBUG)
     node = DMAPNode(model=model, camera=camera, n_div=n_div, debug=True)
+    rclpy.logging.set_logger_level('dmap_node', rclpy.logging.LoggingSeverity.DEBUG)
     if thread > 1:
         executer = MultiThreadedExecutor(num_threads=thread)
         executer.add_node(node)

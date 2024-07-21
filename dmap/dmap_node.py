@@ -73,6 +73,7 @@ class DMAPNode(Node):
         self.debug = debug
         self.fd = os.path.join(exp_dir, datetime.datetime.now().strftime('%y%m%d_%H%M'))
         if not os.path.exists(self.fd): os.makedirs(self.fd)
+        if not os.path.exists(f'{self.fd}/frames') and self.debug: os.makedirs(f'{self.fd}/frames')
         ### TODO: Create service to save map, features, features_ind
 
     def get_goal(self, text):
@@ -102,8 +103,9 @@ class DMAPNode(Node):
         vf = list(conf_freq.values())
         [x, y, _] = kf[0]
         self.get_logger().info(f'Goal: {text}, {x:.2f}, {y:.2f}, {vf[0][1]:.2f}, {vf[0][1]}')
-        self.get_logger().debug(f'Keys in conf:\n\t{ks[:min(5, len(ks))]}\n\t{vs[:min(5, len(vs))]}')
-        self.get_logger().debug(f'Keys in freq:\n\t{kf[:min(5, len(kf))]}\n\t{vf[:min(5, len(vf))]}')
+        if self.debug:
+            self.get_logger().debug(f'Keys in conf:\n\t{ks[:min(5, len(ks))]}\n\t{vs[:min(5, len(vs))]}')
+            self.get_logger().debug(f'Keys in freq:\n\t{kf[:min(5, len(kf))]}\n\t{vf[:min(5, len(vf))]}')
         # TODO: get w
         return x, y, 1.0#w
 
@@ -145,19 +147,20 @@ class DMAPNode(Node):
                 )
                 self.camera_subscription
 
-    def get_frame(self, stamp=time.time()):
+    def get_frame(self, stamp):
+        stamp = stamp.sec + stamp.nanosec * 1e-9
         if self.camera == 'usb':
             self.frame = self.cap.getFrame()
         elif self.camera == 'local':
-            stamp = stamp.sec + stamp.nanosec * 1e-9
             while True:
                 curr_ = os.path.basename(self.image_list[0]).rsplit('.',1)[0]
                 next_ = os.path.basename(self.image_list[1]).rsplit('.',1)[0]
                 if float(next_) > stamp: break
                 self.image_list.pop(0)
             self.frame = PIL.Image.open(self.image_list[0])
+            stamp = float(curr_)
         # self.get_logger().debug(f'Requested time: {stamp}, Frame time: {curr_}')
-        return self.frame, float(curr_)
+        return self.frame, stamp
 
     def split_frame(self, frame):
         frame_div = []
@@ -178,12 +181,10 @@ class DMAPNode(Node):
 
     def encode_frame(self, frame, voxel_div):
         frame_div = self.split_frame(frame)
-        # debug
         if self.debug:
             for i in range(self.n_div):
-                # frame_div[i].save(f'{exp_dir}/frames/{len(self.features)+i}.png')
-                cv2.imwrite(f'{exp_dir}/frames/{len(self.features)+i}.png', cv2.cvtColor(np.array(frame_div[i]), cv2.COLOR_RGB2BGR))
-        # end debug
+                # frame_div[i].save(f'{self.fd}/frames/{len(self.features)+i}.png')
+                cv2.imwrite(f'{self.fd}/frames/{len(self.features)+i}.png', frame_div[i])
         features = (self.clip.encode_images(frame_div))
         # features: [n_div] x [dim]
         self.features += features
@@ -259,7 +260,8 @@ class DMAPNode(Node):
             fps = 1/(time.time()-start)
             self.avgfps = (self.avgfps * self.n_frames + fps)/(self.n_frames+1)
             self.n_frames += 1
-            self.get_logger().debug(f"{[len(voxel_i) for voxel_i in voxel_div]} points added in feature {len(self.features_ind)-1}, {fps:.2f} fps, {self.avgfps:.2f} avgfps")
+            if self.debug:
+                self.get_logger().debug(f"{[len(voxel_i) for voxel_i in voxel_div]} points added in feature {len(self.features_ind)-1}, {fps:.2f} fps, {self.avgfps:.2f} avgfps")
             self.last_scan_time = time.time()
             self.last_scan = scan
             self.last_frame = frame
