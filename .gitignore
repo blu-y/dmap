@@ -2,4 +2,4 @@ exp/
 maps/
 images/
 models/*/open_clip_pytorch_model.bin
-dmap/__pycache__/
+*/__pycache__/
