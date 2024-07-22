@@ -31,6 +31,7 @@ class CLIP:
                 image_features = self.model.encode_image(image)
                 image_features /= image_features.norm(dim=-1, keepdim=True)
                 image_features = image_features[0].tolist()
+            except KeyboardInterrupt: pass
             except Exception as e:
                 print(e)
                 image_features = [0.0] * self.dim
@@ -53,6 +54,7 @@ class CLIP:
                 image_features = self.model.encode_image(images)
                 image_features /= image_features.norm(dim=-1, keepdim=True)
                 image_features = image_features.tolist()
+            except KeyboardInterrupt: pass
             except Exception as e:
                 print(e)
                 image_features = [[0.0] * self.dim] * len(images)

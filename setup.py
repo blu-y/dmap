@@ -23,7 +23,9 @@ setup(
     entry_points={
         'console_scripts': [
             'dmap = dmap.dmap_node:main',
+            'dmap_dev = dmap.dmap_node_dev:main',
             'map_server = dmap.map_server:main',
+            'goal_server = dmap.goal_server:main',
             'img_saver = dmap.img_saver:main',
             'model_downloader = dmap.model_downloader:main',
         ],

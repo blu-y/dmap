@@ -13,8 +13,9 @@ import torch.nn.functional as F
 from open_clip import create_model_from_pretrained, get_tokenizer
 import rclpy
 import rclpy.logging
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from rclpy.node import Node
-from std_msgs.msg import String
+from std_msgs.msg import String, Bool
 from sensor_msgs.msg import LaserScan, PointCloud2, PointField, Image
 from geometry_msgs.msg import PointStamped, PoseStamped
 from tf2_ros.buffer import Buffer
@@ -23,7 +24,6 @@ from tf2_ros.transform_listener import TransformListener
 from cv_bridge import CvBridge
 import sensor_msgs_py.point_cloud2 as pc2
 from dmap import CLIP, Camera, exp_dir
-from std_srvs.srv import Trigger
 import datetime
 import pickle
 
@@ -36,6 +36,7 @@ class DMAPNode(Node):
                 str (if topic, ex) '/camera/image_raw')
         '''
         super().__init__('dmap_node')
+        self.get_logger().info(', '.join(f'{k}={v}' for k, v in vars(args).items()))
         self.set_camera(args.camera)
         self.get_logger().info(f'Camera set to {self.camera}, {args.camera}')
         self.get_logger().info(f'CLIP model initializing to {args.model}')
@@ -77,8 +78,16 @@ class DMAPNode(Node):
         self.scan_pub = []
         for i in range(self.n_div):
             self.scan_pub.append(self.create_publisher(PointCloud2, f'/scan_{i}', 1))
-        self.goal = self.create_subscription(
+        self.goal_sub = self.create_subscription(
             String, '/goal_str', self.goal_cb, 1)
+        self.goal_sub
+        self.map_sub = self.create_subscription(
+            Bool, 
+            '/save_map_req',
+            self.map_cb,
+            1
+        )
+        self.map_sub
         self.goal_pub = self.create_publisher(
             PoseStamped, '/goal_pose', 1)
         self.voxel_T = None
@@ -89,6 +98,9 @@ class DMAPNode(Node):
         self.show_prob = args.show_prob
         self.get_logger().info('DMAP Node initialized')
         ### TODO: Create service to save map, features, features_vox
+
+    def map_cb(self, msg):
+        self.save_features()
 
     def get_goal(self, text):
         f_ind = self.features_vox
@@ -278,6 +290,7 @@ class DMAPNode(Node):
             self.last_scan_time = time.time()
             self.last_scan = scan
             self.last_frame = frame
+        except KeyboardInterrupt: pass
         except Exception as e:
             self.get_logger().warn(f'{e}')
     
@@ -303,11 +316,11 @@ def main():
     parser.add_argument('--model', type=str, default='ViT-B-16-SigLIP', help='Model name')
     parser.add_argument('--leaf_size', type=float, default=0.25, help='Leaf size for voxelization')
     parser.add_argument('--div', type=int, default=3, help='Number of divisions')
-    parser.add_argument('--thread', type=int, default=2, help='Number of threads')
-    parser.add_argument('--debug', type=bool, default=False, help='Debug mode')
-    parser.add_argument('--show_prob', type=bool, default=False, help='Show probability')
+    parser.add_argument('--thread', type=int, default=4, help='Number of threads')
     parser.add_argument('--feature_dir', type=str, default='', help='Features directory')
-    parser.add_argument('--inference', type=bool, default=False, help='Inference mode')
+    parser.add_argument('--debug', action=argparse.BooleanOptionalAction, default=False, help='Debug mode')
+    parser.add_argument('--show_prob', action=argparse.BooleanOptionalAction, default=False, help='Show probability')
+    parser.add_argument('--inference', action=argparse.BooleanOptionalAction, default=False, help='Inference mode')
     parser.add_argument('--ros-args', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     rclpy.init(args=sys.argv)
@@ -322,6 +335,7 @@ def main():
         if args.thread > 1:
             executer.spin()
         else: rclpy.spin(node)
+    except KeyboardInterrupt: pass
     except Exception as e:
         node.get_logger().warn(f'Exception in executor spin: {e}')
     finally:

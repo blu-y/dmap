@@ -1,5 +1,6 @@
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 import numpy as np
 import cv2
 import yaml
@@ -7,6 +8,7 @@ import os
 import glob
 from nav_msgs.msg import OccupancyGrid
 from std_srvs.srv import Trigger
+from std_msgs.msg import Bool
 from .utils import exp_dir
 
 class MapServer(Node):
@@ -16,14 +18,19 @@ class MapServer(Node):
         self.fd = exp_dir
         if not os.path.exists(self.fd): os.makedirs(self.fd)
         self.fn = fn
-        self.subscription = self.create_subscription(
+        self.sub = self.create_subscription(
             OccupancyGrid,
             '/map',
             self.map_callback,
             10
         )
+        self.pub = self.create_publisher(
+            Bool,
+            '/save_map_req',
+            1
+        )
         self.srv = self.create_service(Trigger, '/save_map', self.save_map_cb)
-        self.subscription  # Prevent unused variable warning
+        self.sub  # Prevent unused variable warning
         self.map = None
 
     def map_callback(self, msg):
@@ -37,6 +44,9 @@ class MapServer(Node):
         if self.map is None:
             self.get_logger().info('No map data received yet')
             return
+        msg = Bool()
+        msg.data = True
+        self.pub.publish(msg)
         try:
             msg = self.map
             width = msg.info.width
@@ -69,7 +79,6 @@ class MapServer(Node):
             self.get_logger().info(f'Map saved as {self.fn}.pgm and {self.fn}.yaml')
             response.success = True
             response.message = f'Map saved as {self.fn}.pgm and {self.fn}.yaml'
-            
         except Exception as e:
             self.get_logger().debug(f'Error: {e}') 
             self.get_logger().info('Failed to get map data, retrying...')
@@ -82,6 +91,7 @@ def main():
     node = MapServer()
     try:
         rclpy.spin(node)
+    except KeyboardInterrupt: pass
     except Exception as e: 
         node.get_logger().error(f'Error: {e}')
     finally:
