@@ -82,7 +82,8 @@ def main():
     node = MapServer()
     try:
         rclpy.spin(node)
-    except SystemExit: rclpy.logging.get_logger('map_server').info(f'Map saved, shutting down...')
+    except Exception as e: 
+        node.get_logger().error(f'Error: {e}')
     finally:
         node.destroy_node()
         rclpy.shutdown()

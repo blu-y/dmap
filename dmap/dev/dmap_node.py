@@ -308,7 +308,6 @@ def main():
     parser.add_argument('--show_prob', type=bool, default=False, help='Show probability')
     parser.add_argument('--feature_dir', type=str, default='', help='Features directory')
     parser.add_argument('--inference', type=bool, default=False, help='Inference mode')
-    parser.add_argument('--ros-args', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     rclpy.init(args=sys.argv)
     node = DMAPNode(args=args)

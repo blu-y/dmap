@@ -1,4 +1,5 @@
 from setuptools import setup
+import glob
 
 package_name = 'dmap'
 
@@ -10,6 +11,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name, glob.glob('launch/*.launch.py')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -20,7 +22,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'dmap = dmap.dmap:main',
+            'dmap = dmap.dmap_node:main',
             'map_server = dmap.map_server:main',
             'img_saver = dmap.img_saver:main',
             'model_downloader = dmap.model_downloader:main',
