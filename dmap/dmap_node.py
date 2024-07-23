@@ -5,15 +5,10 @@ import PIL
 import PIL.Image
 from math import cos, sin, inf
 import cv2
-import yaml
 import numpy as np
 import time
-import torch
-import torch.nn.functional as F
-from open_clip import create_model_from_pretrained, get_tokenizer
 import rclpy
 import rclpy.logging
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from rclpy.node import Node
 from std_msgs.msg import String, Bool
 from sensor_msgs.msg import LaserScan, PointCloud2, PointField, Image
@@ -23,7 +18,7 @@ from tf2_geometry_msgs import do_transform_point # to transform
 from tf2_ros.transform_listener import TransformListener
 from cv_bridge import CvBridge
 import sensor_msgs_py.point_cloud2 as pc2
-from dmap import CLIP, Camera, exp_dir
+from dmap import exp_dir, similarity, softmax
 import datetime
 import pickle
 
@@ -37,10 +32,14 @@ class DMAPNode(Node):
         '''
         super().__init__('dmap_node')
         self.get_logger().info(', '.join(f'{k}={v}' for k, v in vars(args).items()))
-        self.set_camera(args.camera)
-        self.get_logger().info(f'Camera set to {self.camera}, {args.camera}')
-        self.get_logger().info(f'CLIP model initializing to {args.model}')
-        self.clip = CLIP(args.model)
+        self.predefined = args.predefined
+        self.load_features(args.feature_dir)
+        if not self.predefined: 
+            self.set_camera(args.camera)
+            self.get_logger().info(f'Camera set to {self.camera}, {args.camera}')
+            self.get_logger().info(f'CLIP model initializing to {args.model}')
+            from dmap import CLIP
+            self.clip = CLIP(args.model)
         self.get_logger().info(f'CLIP model initialized')
         self.tf_buffer = Buffer(cache_time=rclpy.duration.Duration(seconds=10))
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -55,16 +54,6 @@ class DMAPNode(Node):
         self.scan_to = 101
         self.min_range = 0.3
         self.max_range = 3.0
-        if args.feature_dir == '':
-            self.features = []
-            self.features_vox = []
-        else:
-            self.get_logger().info(f'Loading features from {args.feature_dir}')
-            with open(os.path.join(args.feature_dir, 'features.pkl'), 'rb') as f:
-                self.features = pickle.load(f)
-            with open(os.path.join(args.feature_dir, 'features_vox.pkl'), 'rb') as f:
-                self.features_vox = pickle.load(f)
-            self.get_logger().info(f'Loaded {len(self.features)} features and {len(self.features_vox)} features_vox')
         self.fields = [
                 PointField(name='x', offset=0, datatype=PointField.FLOAT32, count=1),
                 PointField(name='y', offset=4, datatype=PointField.FLOAT32, count=1),
@@ -97,16 +86,57 @@ class DMAPNode(Node):
         if not os.path.exists(f'{self.fd}/frames') and self.debug: os.makedirs(f'{self.fd}/frames')
         self.show_prob = args.show_prob
         self.get_logger().info('DMAP Node initialized')
-        ### TODO: Create service to save map, features, features_vox
+        # TODO: to subscribe /save_map_req while processing scan
+
+    def load_features(self, feature_dir):
+        if feature_dir == '':
+            self.features = []
+            self.features_vox = []
+            if self.predefined: raise Exception('Predefined text list is not supported without feature_dir')
+        else:
+            try:
+                self.get_logger().info(f'Loading features from {feature_dir}')
+                with open(os.path.join(feature_dir, 'features.pkl'), 'rb') as f:
+                    self.features = pickle.load(f)
+                with open(os.path.join(feature_dir, 'features_vox.pkl'), 'rb') as f:
+                    self.features_vox = pickle.load(f)
+                self.get_logger().info(f'Loaded {len(self.features)} features and {len(self.features_vox)} features_vox')
+            except FileNotFoundError:
+                self.get_logger().warn(f'\'features.pkl\' and \'features_vox.pkl\' not found in {feature_dir}, starting with empty features')
+                self.features = []
+                self.features_vox = []
+            if self.predefined: 
+                try:
+                    with open(os.path.join(feature_dir, 'text_features.pkl'), 'rb') as f:
+                        self.text_features = pickle.load(f)
+                except FileNotFoundError:
+                    raise Exception('\'text_features.pkl\' not found, please check the directory or run without \'--predefined\'')
 
     def map_cb(self, msg):
         self.save_features()
 
     def get_goal(self, text):
+        if len(self.features) == 0: 
+            self.get_logger().warn('No features to search goal')
+            return None
         f_ind = self.features_vox
-        text_encodings = self.clip.encode_text([text])
-        sim = self.clip.similarity(self.features, text_encodings).squeeze()*100
-        ssim = F.softmax(torch.tensor(sim), dim=0).numpy()
+        if self.predefined:
+            if text not in self.text_features:
+                self.get_logger().warn(f'\'{text}\' not in text_features')
+                self.get_logger().warn(f'Available texts: {list(self.text_features.keys())}')
+                return None
+            text_encodings = self.text_features[text]
+            sim = similarity(self.features, text_encodings).squeeze()*100
+            ssim = softmax(sim)
+        else:
+            try:
+                text_encodings = self.clip.encode_text([text])
+                sim = self.clip.similarity(self.features, text_encodings).squeeze()*100
+                # ssim = F.softmax(torch.tensor(sim), dim=0).numpy()
+                ssim = softmax(sim)
+            except Exception as e:
+                self.get_logger().warn(f'Failed to get similarity: {e}')
+                return None
         nsim = np.zeros_like(ssim)
         nsim[ssim > 0.001] = 1
         m = int(np.sum(nsim))
@@ -127,8 +157,8 @@ class DMAPNode(Node):
         vs = list(conf_score.values())
         kf = list(conf_freq.keys())
         vf = list(conf_freq.values())
-        [x, y, _] = kf[0]
-        self.get_logger().info(f'Goal: {text}, {x:.2f}, {y:.2f}, {vf[0][1]:.2f}, {vf[0][1]}')
+        [x, y, z] = kf[0]
+        self.get_logger().info(f'\'{text}\' Goal: ({x:.2f}, {y:.2f}, {z:.2f}), score: {vf[0][0]:.3f}, freq: {vf[0][1]}')
         if self.debug:
             self.get_logger().debug(f'Keys in conf:\n\t{ks[:min(5, len(ks))]}\n\t{vs[:min(5, len(vs))]}')
             self.get_logger().debug(f'Keys in freq:\n\t{kf[:min(5, len(kf))]}\n\t{vf[:min(5, len(vf))]}')
@@ -136,11 +166,16 @@ class DMAPNode(Node):
         return x, y, 1.0#w
 
     def goal_cb(self, msg):
+        self.get_logger().info("Received goal command: '"+msg.data+"'")
         text = msg.data
         goal = PoseStamped()
         goal.header.frame_id = "map"
         goal.header.stamp = self.get_clock().now().to_msg()
-        goal.pose.position.x, goal.pose.position.y, goal.pose.orientation.w = self.get_goal(text)
+        try:
+            goal.pose.position.x, goal.pose.position.y, goal.pose.orientation.w = self.get_goal(text)
+        except: 
+            self.get_logger().warn('Failed to get goal')
+            return
         goal.pose.position.z = 0.0
         goal.pose.orientation.x = 0.0
         goal.pose.orientation.y = 0.0
@@ -151,6 +186,7 @@ class DMAPNode(Node):
         if isinstance(camera, int):
             self.get_logger().info(f'Using USB camera {camera}')
             self.camera = 'usb'
+            from dmap import Camera
             self.cap = Camera(camera)
         elif isinstance(camera, str):
             if os.path.exists(os.path.expanduser(camera)):
@@ -220,7 +256,8 @@ class DMAPNode(Node):
 
     def scan_cb(self, msg: LaserScan):
         self.scan = msg
-        if self.clip.available and not self.inference: self.process_scan()
+        if self.predefined or self.inference: return
+        if self.clip.available: self.process_scan()
 
     def camera_cb(self, msg):
         self.frame = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
@@ -240,7 +277,7 @@ class DMAPNode(Node):
             voxel_div.append(unique_voxels.tolist())
         # voxel_div: [n_div] x [n_points] x [3]
         return voxel_div
-
+    
     def transform_scan(self, scan: LaserScan):
         size = len(scan.ranges)//self.n_div
         # transform = self.tf_buffer.lookup_transform('map', 'base_link', scan.header.stamp)
@@ -321,6 +358,7 @@ def main():
     parser.add_argument('--debug', action=argparse.BooleanOptionalAction, default=False, help='Debug mode')
     parser.add_argument('--show_prob', action=argparse.BooleanOptionalAction, default=False, help='Show probability')
     parser.add_argument('--inference', action=argparse.BooleanOptionalAction, default=False, help='Inference mode')
+    parser.add_argument('--predefined', action=argparse.BooleanOptionalAction, default=False, help='Predefined text list mode')
     parser.add_argument('--ros-args', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     rclpy.init(args=sys.argv)
@@ -337,11 +375,12 @@ def main():
         else: rclpy.spin(node)
     except KeyboardInterrupt: pass
     except Exception as e:
-        node.get_logger().warn(f'Exception in executor spin: {e}')
+        node.get_logger().error(f'Exception in executor spin: {e}')
     finally:
         node.save_features()
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

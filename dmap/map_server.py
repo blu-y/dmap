@@ -24,13 +24,15 @@ class MapServer(Node):
             self.map_callback,
             10
         )
+        self.sub
         self.pub = self.create_publisher(
             Bool,
             '/save_map_req',
             1
         )
         self.srv = self.create_service(Trigger, '/save_map', self.save_map_cb)
-        self.sub  # Prevent unused variable warning
+        self.get_logger().info('Map Server Ready\n \
+                                ros2 service call /save_map std_srvs/srv/Trigger')
         self.map = None
 
     def map_callback(self, msg):
@@ -43,7 +45,9 @@ class MapServer(Node):
             self.fn = sorted(os.listdir(exp_dir))[-1]+'/map'
         if self.map is None:
             self.get_logger().info('No map data received yet')
-            return
+            response.success = False
+            response.message = 'No map data received yet'
+            return response
         msg = Bool()
         msg.data = True
         self.pub.publish(msg)
@@ -55,7 +59,6 @@ class MapServer(Node):
             origin = msg.info.origin
             map_data = np.array(msg.data).reshape((height, width))
             self.get_logger().debug(f'{np.unique(map_data)}')
-
             # Convert the occupancy data to a PGM image
             pgm_data = np.full_like(map_data, 205, dtype=np.uint8)
             pgm_data[np.logical_and(map_data >= 0, map_data <= 25)] = 254
@@ -63,7 +66,6 @@ class MapServer(Node):
             self.get_logger().debug(f'{np.unique(pgm_data)}')
             pgm_fn = os.path.join(self.fd, self.fn+'.pgm')
             cv2.imwrite(pgm_fn, pgm_data)
-
             # Save the metadata to a YAML file
             map_metadata = {
                 'image': f'{self.fn}.pgm',
@@ -80,10 +82,9 @@ class MapServer(Node):
             response.success = True
             response.message = f'Map saved as {self.fn}.pgm and {self.fn}.yaml'
         except Exception as e:
-            self.get_logger().debug(f'Error: {e}') 
-            self.get_logger().info('Failed to get map data, retrying...')
+            self.get_logger().info(f'Failed to get map data, {e}')
             response.success = False
-
+            response.message = f'Failed to get map data, {e}'
         return response
 
 def main():
@@ -96,7 +97,8 @@ def main():
         node.get_logger().error(f'Error: {e}')
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

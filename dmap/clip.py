@@ -74,9 +74,9 @@ class CLIP:
     #     if self.cuda: return image_features @ text_features.cpu().numpy().T
     #     else: return image_features @ text_features.numpy().T
 
-    def similarity(image_features, text_features):
+    def similarity(self, image_features, text_features):
         if isinstance(image_features, list): image_features = np.array(image_features)
         if isinstance(text_features, list): text_features = np.array(text_features)
-        if torch.cuda.is_available(): 
-            return image_features @ text_features.cpu().numpy().T
+        # if torch.cuda.is_available(): 
+        #     return image_features @ text_features.cpu().numpy().T
         return np.dot(image_features, text_features.T)

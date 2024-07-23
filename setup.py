@@ -28,6 +28,7 @@ setup(
             'goal_server = dmap.goal_server:main',
             'img_saver = dmap.img_saver:main',
             'model_downloader = dmap.model_downloader:main',
+            'predefine_text = dmap.predefine_text:main',
         ],
     },
 )

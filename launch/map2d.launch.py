@@ -50,6 +50,11 @@ def generate_launch_description():
         default_value='',
         description='Inference mode'
     )
+    predefined_arg = DeclareLaunchArgument(
+        'predefined',
+        default_value='',
+        description='Predefined text list mode'
+    )
 
     # Define the node with configurations
     dmap_node = Node(
@@ -63,9 +68,10 @@ def generate_launch_description():
             '--div', LaunchConfiguration('div'),
             '--thread', LaunchConfiguration('thread'),
             '--feature_dir', LaunchConfiguration('feature_dir'),
-            '--debug',
+            # '--debug',
             '--show_prob',
             # '--inference',
+            # '--predefined',
         ]
     )
     goal_server_node = Node(
@@ -90,9 +96,11 @@ def generate_launch_description():
         debug_arg,
         show_prob_arg,
         inference_arg,
+        predefined_arg,
         dmap_node,
         goal_server_node,
         map_server_node,
     ])
+
 if __name__ == '__main__':
     generate_launch_description()

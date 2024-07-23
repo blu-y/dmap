@@ -71,7 +71,7 @@ def generate_launch_description():
             # '--debug',
             '--show_prob',
             '--inference',
-            '--predefined',
+            # '--predefined',
         ]
     )
     goal_server_node = Node(
