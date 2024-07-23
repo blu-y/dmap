@@ -4,7 +4,7 @@ import rclpy
 from rclpy.node import Node
 import pickle
 
-# Usage: ros2 run dmap predefine_text.py -l <text1> <text2> ...
+# Usage: ros2 run dmap predefine_text -l 'text1' 'text2' ...
 
 def main():
     parser = argparse.ArgumentParser("Predefine text list")

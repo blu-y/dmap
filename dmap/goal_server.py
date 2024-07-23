@@ -22,7 +22,7 @@ class GoalServer(Node):
         )
         self.srv = self.create_service(DmapGoal, '/goal_command', self.command_cb)
         self.get_logger().info('Goal Server Ready\n \
-                               ros2 service call /goal_command dmap_msgs/srv/DmapGoal "{command: \'a bottle of water\'}"')
+                               ros2 service call /goal_command dmap_msgs/srv/DmapGoal "{command: \'a bottle of water\'}" ')
 
     def command_cb(self, request, response):
         try:
