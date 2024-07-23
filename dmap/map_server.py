@@ -15,9 +15,10 @@ class MapServer(Node):
     def __init__(self, fn=None):
         super().__init__('map_server')
         self.get_logger().info('Getting map data...')
-        self.fd = exp_dir
-        if not os.path.exists(self.fd): os.makedirs(self.fd)
-        self.fn = fn
+        if not os.path.exists(exp_dir): os.makedirs(exp_dir)
+        if fn is None:
+            self.fn = 'map'
+        else: self.fn = fn
         self.sub = self.create_subscription(
             OccupancyGrid,
             '/map',
@@ -41,8 +42,9 @@ class MapServer(Node):
     
     def save_map_cb(self, request, response):
         self.get_logger().info('Saving map...')
-        if self.fn is None:
-            self.fn = sorted(os.listdir(exp_dir))[-1]+'/map'
+        all_folders = [f for f in glob.glob(exp_dir + "/*") if os.path.isdir(f)]
+        fd = max(all_folders, key=os.path.getctime)
+        self.get_logger().info('Debug: '+fd)
         if self.map is None:
             self.get_logger().info('No map data received yet')
             response.success = False
@@ -64,7 +66,7 @@ class MapServer(Node):
             pgm_data[np.logical_and(map_data >= 0, map_data <= 25)] = 254
             pgm_data[np.logical_and(map_data >= 65, map_data <= 100)] = 0
             self.get_logger().debug(f'{np.unique(pgm_data)}')
-            pgm_fn = os.path.join(self.fd, self.fn+'.pgm')
+            pgm_fn = os.path.join(fd, self.fn+'.pgm')
             cv2.imwrite(pgm_fn, pgm_data)
             # Save the metadata to a YAML file
             map_metadata = {
@@ -75,12 +77,12 @@ class MapServer(Node):
                 'occupied_thresh': 0.65,
                 'free_thresh': 0.25
             }
-            yaml_fn = os.path.join(self.fd, self.fn+'.yaml')
+            yaml_fn = os.path.join(fd, self.fn+'.yaml')
             with open(yaml_fn, 'w') as yaml_file:
                 yaml.dump(map_metadata, yaml_file)
-            self.get_logger().info(f'Map saved as {self.fn}.pgm and {self.fn}.yaml')
+            self.get_logger().info(f'Map saved as {pgm_fn} and {yaml_fn}')
             response.success = True
-            response.message = f'Map saved as {self.fn}.pgm and {self.fn}.yaml'
+            response.message = f'Map saved as {pgm_fn} and {yaml_fn}'
         except Exception as e:
             self.get_logger().info(f'Failed to get map data, {e}')
             response.success = False
