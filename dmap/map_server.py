@@ -44,7 +44,6 @@ class MapServer(Node):
         self.get_logger().info('Saving map...')
         all_folders = [f for f in glob.glob(exp_dir + "/*") if os.path.isdir(f)]
         fd = max(all_folders, key=os.path.getctime)
-        self.get_logger().info('Debug: '+fd)
         if self.map is None:
             self.get_logger().info('No map data received yet')
             response.success = False
