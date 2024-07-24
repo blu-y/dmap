@@ -3,7 +3,6 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 import numpy as np
 import cv2
-import yaml
 import os
 import glob
 from nav_msgs.msg import OccupancyGrid
@@ -68,17 +67,15 @@ class MapServer(Node):
             pgm_fn = os.path.join(fd, self.fn+'.pgm')
             cv2.imwrite(pgm_fn, np.flip(pgm_data, 0))
             # Save the metadata to a YAML file
-            map_metadata = {
-                'image': f'{self.fn}.pgm',
-                'resolution': resolution,
-                'origin': [origin.position.x, origin.position.y, origin.position.z],
-                'negate': 0,
-                'occupied_thresh': 0.65,
-                'free_thresh': 0.25
-            }
             yaml_fn = os.path.join(fd, self.fn+'.yaml')
-            with open(yaml_fn, 'w') as yaml_file:
-                yaml.dump(map_metadata, yaml_file)
+            with open(yaml_fn, 'w') as f:
+                f.write(f'image: {self.fn}.pgm\n')
+                f.write(f'mode: trinary\n')
+                f.write(f'resolution: {resolution:.3f}\n')
+                f.write(f'origin: [{origin.position.x:.3f}, {origin.position.y:.3f}, {origin.position.z:.3f}]\n')
+                f.write(f'negate: 0\n')
+                f.write(f'occupied_thresh: 0.65\n')
+                f.write(f'free_thresh: 0.25\n')
             self.get_logger().info(f'Map saved as {pgm_fn} and {yaml_fn}')
             response.success = True
             response.message = f'Map saved as {pgm_fn} and {yaml_fn}'
