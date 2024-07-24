@@ -219,7 +219,7 @@ class DMAPNode(Node):
                 next_ = os.path.basename(self.image_list[1]).rsplit('.',1)[0]
                 if float(next_) > stamp: break
                 self.image_list.pop(0)
-            self.frame = PIL.Image.open(self.image_list[0])
+            self.frame = cv2.imread(self.image_list[0])
             stamp = float(curr_)
         # self.get_logger().debug(f'Requested time: {stamp}, Frame time: {curr_}')
         return self.frame, stamp
