@@ -1,5 +1,10 @@
 from .utils import make_utc, find_ros2_package_dir, similarity, softmax, dmap_dir, models_dir, maps_dir, exp_dir
-from .clip import CLIP
+try:
+    from .clip import CLIP
+except: 
+    print('CLIP not available, only predefined mode is available')
+    pass
+
 from .camera import Camera
 
 # package_variable
