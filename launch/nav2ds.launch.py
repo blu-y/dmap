@@ -2,6 +2,7 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
+from dmap import example_dir
 
 def generate_launch_description():
     # Declare the launch arguments
@@ -32,7 +33,7 @@ def generate_launch_description():
     )
     feature_dir_arg = DeclareLaunchArgument(
         'feature_dir',
-        default_value='',
+        default_value=example_dir,
         description='Features directory'
     )
     debug_arg = DeclareLaunchArgument(
