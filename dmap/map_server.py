@@ -66,7 +66,7 @@ class MapServer(Node):
             pgm_data[np.logical_and(map_data >= 65, map_data <= 100)] = 0
             self.get_logger().debug(f'{np.unique(pgm_data)}')
             pgm_fn = os.path.join(fd, self.fn+'.pgm')
-            pgm_data = np.flip(pgm_data, 0)
+            # pgm_data = np.flip(pgm_data, 0)
             pgm_data = np.flip(pgm_data, 1)
             cv2.imwrite(pgm_fn, pgm_data)
             # Save the metadata to a YAML file
