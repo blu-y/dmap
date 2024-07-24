@@ -3,3 +3,4 @@ maps/
 images/
 models/*/open_clip_pytorch_model.bin
 */__pycache__/
+data/
