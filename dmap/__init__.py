@@ -3,8 +3,6 @@ try:
     from .clip import CLIP
 except: 
     print('CLIP not available, only predefined mode is available')
-    pass
-
 from .camera import Camera
 
 # package_variable
