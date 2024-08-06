@@ -16,7 +16,7 @@ pip install torch-2.3.0-cp310-cp310-linux_aarch64.whl torchvision-0.18.0a0+6043b
 echo "For JetPack 6(L4T R36.2/R36.3) + CUDA 12.2 ONLY)"
 echo "Else Follow this link to install pytorch on jetson"
 echo "https://forums.developer.nvidia.com/t/pytorch-for-jetson/72048"
-echo "export PATH=/home/jetson/.local/bin:\$PATH" >> ~/.bashrc
+echo "export PATH=$HOME/.local/bin:\$PATH" >> ~/.bashrc
 echo "export LD_LIBRARY_PATH=/usr/lib/llvm-8/lib:\$LD_LIBRARY_PATH" >> ~/.bashrc
 wget https://github.com/rustdesk/rustdesk/releases/download/1.2.3-2/rustdesk-1.2.3-2-aarch64.deb
 sudo apt install -fy  ./rustdesk-1.2.3-2-aarch64.deb
