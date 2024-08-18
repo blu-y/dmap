@@ -4,7 +4,7 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from ament_index_python.packages import FindPackageShare
+from launch_ros.substitutions import FindPackageShare
 from dmap import example_dir
 import os
 
@@ -102,6 +102,17 @@ def generate_launch_description():
         launch_arguments={'map': os.path.join(example_dir, 'map.yaml')}.items()
     )
 
+    # Include the TurtleBot4 nav2 launch file
+    nav2_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(
+                FindPackageShare('turtlebot4_navigation').find('turtlebot4_navigation'),
+                'launch',
+                'nav2.launch.py'
+            )
+        ),
+    )
+
     # Create and return the launch description
     return LaunchDescription([
         camera_arg,
@@ -118,6 +129,7 @@ def generate_launch_description():
         goal_server_node,
         map_server_node,
         localization_launch,
+        nav2_launch,
     ])
 
 if __name__ == '__main__':
