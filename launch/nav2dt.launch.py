@@ -84,11 +84,6 @@ def generate_launch_description():
         executable='goal_server',
         output='screen'
     )
-    map_server_node = Node(
-        package='dmap',
-        executable='map_server',
-        output='screen'
-    )
 
     # Include the TurtleBot4 localization launch file
     localization_launch = IncludeLaunchDescription(
@@ -127,7 +122,6 @@ def generate_launch_description():
         predefined_arg,
         dmap_node,
         goal_server_node,
-        map_server_node,
         localization_launch,
         nav2_launch,
     ])
