@@ -426,6 +426,7 @@ class DMAPInference():
         [x, y, z] = kf[0]
         print(f'\'{text}\' Goal: ({x:.2f}, {y:.2f}, {z:.2f}), score: {vf[0][0]:.3f}, freq: {vf[0][1]}')
         if self.debug:
+            print(f'{m} Candidate frames: {sim_sort_ind}')
             print(f'Keys in conf:\n\t{ks[:min(5, len(ks))]}\n\t{vs[:min(5, len(vs))]}')
             print(f'Keys in freq:\n\t{kf[:min(5, len(kf))]}\n\t{vf[:min(5, len(vf))]}')
         # TODO: get w

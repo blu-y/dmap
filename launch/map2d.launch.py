@@ -68,7 +68,7 @@ def generate_launch_description():
             '--div', LaunchConfiguration('div'),
             '--thread', LaunchConfiguration('thread'),
             '--feature_dir', LaunchConfiguration('feature_dir'),
-            # '--debug',
+            '--debug',
             '--show_prob',
             # '--inference',
             # '--predefined',
