@@ -24,7 +24,7 @@ import pickle
 
 sys.path.append(os.getcwd())
 
-class DMAPNode(Node):
+class DMAPROS(Node):
     def __init__(self, args):
         '''
         camera: int (if usb camera, ex) 0, 1, 2, ...)
@@ -309,7 +309,7 @@ class DMAPNode(Node):
             frame, stamp = self.get_frame(scan.header.stamp)
             if stamp == self.last_frame_time: return
             if not self.is_keyframe(): return
-            self.last_frame_time = stamp
+            self.last_frame_tDMAPROSime = stamp
             if self.scan_from < 0:
                 scan.ranges = scan.ranges[self.scan_from:] + scan.ranges[:self.scan_to]
             else: scan.ranges = scan.ranges[self.scan_from:self.scan_to]
@@ -337,6 +337,108 @@ class DMAPNode(Node):
         with open(f'{self.fd}/features_vox.pkl', 'wb') as f:
             pickle.dump(self.features_vox, f)
         self.get_logger().info(f'Saved {len(self.features)} features and {len(self.features_vox)} features_vox in {self.fd}')
+
+class DMAPInference():
+    def __init__(self, predefined=False, feature_dir=exp_dir, model='ViT-B-16-SigLIP', debug=False, show_prob=False, show_candidates=False):
+        print(f'predefined:{predefined}, feature_dir:{feature_dir}, model:{model}, debug:{debug}, show_prob:{show_prob}')
+        self.predefined = predefined
+        self.load_features(feature_dir)
+        if not self.predefined: 
+            print(f'CLIP model initializing to {model}')
+            from dmap import CLIP
+            self.clip = CLIP(model)
+            print(f'CLIP model initialized')
+        self.debug = debug
+        # TODO: Implement show_prob and show_candidates
+        self.show_prob = show_prob
+        self.show_candidates = show_candidates
+        self.fd = os.path.join(exp_dir, datetime.datetime.now().strftime('%y%m%d_%H%M'))
+        if not os.path.exists(self.fd): os.makedirs(self.fd)
+        if not os.path.exists(f'{self.fd}/frames') and self.debug: os.makedirs(f'{self.fd}/frames')
+        print('DMAP Inference initialized')
+
+    def load_features(self, feature_dir):
+        if feature_dir == '':
+            self.features = []
+            self.features_vox = []
+            if self.predefined: raise Exception('Predefined text list is not supported without feature_dir')
+        else:
+            try:
+                print(f'Loading features from {feature_dir}')
+                with open(os.path.join(feature_dir, 'features.pkl'), 'rb') as f:
+                    self.features = pickle.load(f)
+                with open(os.path.join(feature_dir, 'features_vox.pkl'), 'rb') as f:
+                    self.features_vox = pickle.load(f)
+                print(f'Loaded {len(self.features)} features and {len(self.features_vox)} features_vox')
+            except FileNotFoundError:
+                print(f'\'features.pkl\' and \'features_vox.pkl\' not found in {feature_dir}, starting with empty features')
+                self.features = []
+                self.features_vox = []
+            if self.predefined: 
+                try:
+                    with open(os.path.join(feature_dir, 'text_features.pkl'), 'rb') as f:
+                        self.text_features = pickle.load(f)
+                except FileNotFoundError:
+                    raise Exception('\'text_features.pkl\' not found, please check the directory or run with \'predefined=False\'')
+
+    def get_goal(self, text):
+        if len(self.features) == 0: 
+            print('No features to search goal')
+            return None
+        f_ind = self.features_vox
+        if self.predefined:
+            if text not in self.text_features:
+                print(f'\'{text}\' not in text_features')
+                print(f'Available texts: {list(self.text_features.keys())}')
+                return None
+            text_encodings = self.text_features[text]
+            sim = similarity(self.features, text_encodings).squeeze()*100
+            ssim = softmax(sim)
+        else:
+            try:
+                text_encodings = self.clip.encode_text([text])
+                sim = self.clip.similarity(self.features, text_encodings).squeeze()*100
+                # ssim = F.softmax(torch.tensor(sim), dim=0).numpy()
+                ssim = softmax(sim)
+            except Exception as e:
+                print(f'Failed to get similarity: {e}')
+                return None
+        nsim = np.zeros_like(ssim)
+        nsim[ssim > 0.001] = 1
+        m = int(np.sum(nsim))
+        sim_sort_ind = np.argsort(sim, axis=0)[::-1]
+        sim_sort_ind = sim_sort_ind[:m]
+        conf = {}
+        for index in sim_sort_ind:
+            # print(len(features_vox[index]), features_vox[index])
+            s_i = sim[index]
+            n_point = len(f_ind[index])
+            for point in f_ind[index]:
+                [_s, _n] = conf.get(tuple(point), [0,0])
+                conf[tuple(point)] = [(_s * _n + s_i) / (_n + 1), _n + 1]
+        # sort confidence by value
+        conf_score = dict(sorted(conf.items(), key=lambda item: item[1], reverse=True))
+        conf_freq = dict(sorted(conf.items(), key=lambda item: item[1][1], reverse=True))
+        ks = list(conf_score.keys())
+        vs = list(conf_score.values())
+        kf = list(conf_freq.keys())
+        vf = list(conf_freq.values())
+        [x, y, z] = kf[0]
+        print(f'\'{text}\' Goal: ({x:.2f}, {y:.2f}, {z:.2f}), score: {vf[0][0]:.3f}, freq: {vf[0][1]}')
+        if self.debug:
+            print(f'Keys in conf:\n\t{ks[:min(5, len(ks))]}\n\t{vs[:min(5, len(vs))]}')
+            print(f'Keys in freq:\n\t{kf[:min(5, len(kf))]}\n\t{vf[:min(5, len(vf))]}')
+        return x, y, 1.0#w
+
+def DMAPNode(args=None, predefined=False, feature_dir=exp_dir, model='ViT-B-16-SigLIP', debug=False, show_prob=False, show_candidates=False):
+    if args is None:
+        return DMAPInference(predefined=predefined, 
+                             feature_dir=feature_dir, 
+                             model=model, 
+                             debug=debug, 
+                             show_prob=show_prob, 
+                             show_candidates=show_candidates)
+    return DMAPROS(args)
 
 import argparse
 from rclpy.executors import MultiThreadedExecutor
