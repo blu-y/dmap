@@ -419,16 +419,18 @@ class DMAPInference():
         # sort confidence by value
         conf_score = dict(sorted(conf.items(), key=lambda item: item[1], reverse=True))
         conf_freq = dict(sorted(conf.items(), key=lambda item: item[1][1], reverse=True))
-        ks = list(conf_score.keys())
-        vs = list(conf_score.values())
-        kf = list(conf_freq.keys())
-        vf = list(conf_freq.values())
+        ks = list(conf_score.keys()) # coordinates sorted by score
+        vs = list(conf_score.values()) # scores
+        kf = list(conf_freq.keys()) # coordinates sorted by frequency
+        vf = list(conf_freq.values()) # frequencies
         [x, y, z] = kf[0]
         print(f'\'{text}\' Goal: ({x:.2f}, {y:.2f}, {z:.2f}), score: {vf[0][0]:.3f}, freq: {vf[0][1]}')
         if self.debug:
             print(f'Keys in conf:\n\t{ks[:min(5, len(ks))]}\n\t{vs[:min(5, len(vs))]}')
             print(f'Keys in freq:\n\t{kf[:min(5, len(kf))]}\n\t{vf[:min(5, len(vf))]}')
-        return x, y, 1.0#w
+        # TODO: get w
+        w = 1.0
+        return x, y, w, ks, vs, kf, vf
 
 def DMAPNode(args=None, predefined=False, feature_dir=example_dir, model='ViT-B-16-SigLIP', debug=False, show_prob=False, show_candidates=False):
     if args is None:
