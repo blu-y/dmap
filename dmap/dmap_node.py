@@ -18,7 +18,7 @@ from tf2_geometry_msgs import do_transform_point # to transform
 from tf2_ros.transform_listener import TransformListener
 from cv_bridge import CvBridge
 import sensor_msgs_py.point_cloud2 as pc2
-from dmap import exp_dir, similarity, softmax
+from dmap import exp_dir, similarity, softmax, example_dir
 import datetime
 import pickle
 
@@ -339,7 +339,7 @@ class DMAPROS(Node):
         self.get_logger().info(f'Saved {len(self.features)} features and {len(self.features_vox)} features_vox in {self.fd}')
 
 class DMAPInference():
-    def __init__(self, predefined=False, feature_dir=exp_dir, model='ViT-B-16-SigLIP', debug=False, show_prob=False, show_candidates=False):
+    def __init__(self, predefined=False, feature_dir=example_dir, model='ViT-B-16-SigLIP', debug=False, show_prob=False, show_candidates=False):
         print(f'predefined:{predefined}, feature_dir:{feature_dir}, model:{model}, debug:{debug}, show_prob:{show_prob}')
         self.predefined = predefined
         self.load_features(feature_dir)
@@ -430,7 +430,7 @@ class DMAPInference():
             print(f'Keys in freq:\n\t{kf[:min(5, len(kf))]}\n\t{vf[:min(5, len(vf))]}')
         return x, y, 1.0#w
 
-def DMAPNode(args=None, predefined=False, feature_dir=exp_dir, model='ViT-B-16-SigLIP', debug=False, show_prob=False, show_candidates=False):
+def DMAPNode(args=None, predefined=False, feature_dir=example_dir, model='ViT-B-16-SigLIP', debug=False, show_prob=False, show_candidates=False):
     if args is None:
         return DMAPInference(predefined=predefined, 
                              feature_dir=feature_dir, 
